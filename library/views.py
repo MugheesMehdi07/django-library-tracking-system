@@ -1,3 +1,6 @@
+import datetime
+import json
+
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from .models import Author, Book, Member, Loan
@@ -52,3 +55,23 @@ class MemberViewSet(viewsets.ModelViewSet):
 class LoanViewSet(viewsets.ModelViewSet):
     queryset = Loan.objects.all()
     serializer_class = LoanSerializer
+
+    @action(detail=True, methods=['post'])
+    def extend_due_date(self, request, pk=None):
+        add_days = int(request.data.get("additional_days"))
+        if add_days > 0:
+            loan = self.get_object()
+            if not loan:
+                return Response({'error': 'No loan found.'}, status=status.HTTP_400_BAD_REQUEST)
+            current_time = str(datetime.datetime.now())
+            if  loan.due_date < datetime.datetime.strptime(current_time, "%Y-%m-%d"):
+                return Response({'error': 'Loan is already overdue.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            loan.due_date += datetime.timedelta(days=int(add_days))
+            loan.save()
+
+            return Response({'status': 'Loan extended successfully.',
+                             'updated_loan': json.dumps(loan)}, status=status.HTTP_201_CREATED)
+        else:
+            return Response({'error': 'Extend Date should be greater than 0'}, status=status.HTTP_400_BAD_REQUEST)
+
